@@ -12,11 +12,18 @@ prompt = sys.argv[1] if len(sys.argv) > 1 else os.getenv("PROMPT", "")
 # Define the model
 MODEL = "compound-beta"
 
-# Define the system prompt to ensure structured JSON output
-system_prompt = """
-You are a job listing parser. Given a job description or prompt, extract and return a JSON object with the following keys: job_title, job_link, company, city, and remote. If any information is missing, use null for that field. Ensure the output is valid JSON.
+# Estimate token count (rough: 1 token ≈ 4 characters)
+def estimate_tokens(text):
+    return len(text) // 4 + 1
 
-Example output:
+# Define a conservative max token limit (adjust based on model)
+MAX_TOKENS = 4096  # Conservative limit; adjust if model supports more
+
+# Define a concise system prompt
+system_prompt = """
+Parse the job description into a JSON object with keys: job_title, job_link, company, city, remote. Use null for missing fields. Return only valid JSON, no extra text.
+
+Example:
 {
   "job_title": "Software Engineer",
   "job_link": "https://example.com/jobs/123",
@@ -25,6 +32,22 @@ Example output:
   "remote": true
 }
 """
+
+# Log prompt details for debugging
+total_prompt = system_prompt + prompt
+print(f"Input Prompt Length: {len(prompt)} characters, ~{estimate_tokens(prompt)} tokens")
+print(f"Total Request Length (with system prompt): {len(total_prompt)} characters, ~{estimate_tokens(total_prompt)} tokens")
+print("Input Prompt Content:")
+print(prompt)
+print("--- End of Input Prompt ---")
+
+# Check if prompt is too large
+if estimate_tokens(total_prompt) > MAX_TOKENS:
+    print(f"Error: Prompt too large (~{estimate_tokens(total_prompt)} tokens exceeds {MAX_TOKENS} token limit). Please shorten the prompt.")
+    # Optionally trim the prompt (uncomment to enable)
+    # prompt = prompt[:MAX_TOKENS * 4 - len(system_prompt)]
+    # print("Prompt trimmed to fit token limit.")
+    sys.exit(1)
 
 try:
     # Create the chat completion
