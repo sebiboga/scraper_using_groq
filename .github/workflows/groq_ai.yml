@@ -34,9 +34,11 @@ jobs:
           PROMPT: ${{ github.event.inputs.prompt }}
         run: python parse_job.py "$PROMPT"
 
-      # Store the output
+      # Store the output (include both JSON and raw response)
       - name: Upload result
         uses: actions/upload-artifact@v4
         with:
           name: job-output
-          path: job_output.json
+          path: |
+            job_output.json
+            raw_response.txt
