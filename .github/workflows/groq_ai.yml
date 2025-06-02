@@ -31,12 +31,10 @@ jobs:
       - name: Run Groq job parser
         env:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
-        run: python parse_job.py
-        # Pass the prompt as an environment variable
-        with:
-          args: ${{ github.event.inputs.prompt }}
+          PROMPT: ${{ github.event.inputs.prompt }}
+        run: python parse_job.py "$PROMPT"
 
-      # Store the output (optional, for debugging or further use)
+      # Store the output
       - name: Upload result
         uses: actions/upload-artifact@v4
         with:
