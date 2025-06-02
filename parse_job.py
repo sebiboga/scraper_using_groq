@@ -35,8 +35,8 @@ try:
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": prompt}
         ],
-        temperature=1,
-        max_completion_tokens=1024,
+        temperature=0.5,
+        max_completion_tokens=2048,
         top_p=1,
         stream=False,  # Stream set to False for simplicity
         stop=None,
