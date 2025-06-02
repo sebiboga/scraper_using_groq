@@ -1,0 +1,38 @@
+name: Run cURL with Groq API
+
+on:
+  workflow_dispatch:
+    inputs:
+      model:
+        description: 'Select the model to use'
+        required: true
+        type: choice
+        options:
+          - llama-3.3-70b-versatile
+          - compound-beta
+          - compound-beta-mini
+      content:
+        description: 'Enter the content for the chat prompt'
+        required: true
+        type: string
+        default: 'Explain the importance of fast language models'
+
+jobs:
+  run-curl:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Run cURL command
+        env:
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+        run: |
+          curl https://api.groq.com/openai/v1/chat/completions -s \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer $GROQ_API_KEY" \
+            -d '{
+              "model": "${{ inputs.model }}",
+              "messages": [{
+                "role": "user",
+                "content": "${{ inputs.content }}"
+              }]
+            }'
