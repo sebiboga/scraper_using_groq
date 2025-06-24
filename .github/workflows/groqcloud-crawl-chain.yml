@@ -88,12 +88,24 @@ jobs:
           -H "Authorization: Bearer $GROQ_API_KEY" \
           -d "$PAYLOAD")
 
-        CONTENT=$(echo "$RESPONSE" | jq -r '.choices[0].message.content')
+         CONTENT=$(echo "$RESPONSE" | jq -r '.choices[0].message.content')
 
-        echo "Extracted job links JSON:"
-        echo "$CONTENT"
+          echo "Raw content:"
+          echo "$CONTENT"
 
-        echo "job_links=$CONTENT" >> $GITHUB_OUTPUT
+          # Extract JSON from code block if present
+          JOB_LINKS=$(echo "$CONTENT" | sed -n '/```
+
+          # If the model returns only [], this will work; if it's empty, fallback to []
+          if [ -z "$JOB_LINKS" ]; then
+            JOB_LINKS="[]"
+          fi
+
+          echo "Extracted job links JSON:"
+          echo "$JOB_LINKS"
+
+          # Set output only if it's valid JSON
+          echo "job_links=$JOB_LINKS" >> $GITHUB_OUTPUT
           
 
     
