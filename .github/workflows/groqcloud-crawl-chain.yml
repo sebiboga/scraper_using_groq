@@ -1,4 +1,4 @@
-name: GroqCloud Crawl Career Page
+name: Run GroqCloud Crawler with curl
 
 on:
   workflow_dispatch:
@@ -6,43 +6,44 @@ on:
       start_url:
         description: 'Starting URL domain (e.g. https://farmec.ro)'
         required: true
+        type: string
         default: 'https://farmec.ro'
+      model:
+        description: 'Select the model to use'
+        required: true
+        type: choice
+        options:
+          - compound-beta
+          - compound-beta-mini
+          - llama-3.3-70b-versatile
+        default: compound-beta
 
 jobs:
-  crawl_career_page:
+  run-curl:
     runs-on: ubuntu-latest
-    env:
-      GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+
     steps:
-      - name: Call GroqCloud API with system prompt and user start URL
-        id: groq_call
+      - name: Call GroqCloud API with system and user prompts
+        id: call_api
+        env:
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          START_URL: ${{ github.event.inputs.start_url }}
+          MODEL: ${{ github.event.inputs.model }}
         run: |
           SYSTEM_PROMPT="act like a smart crawler better than apache nutch; the crawling will start from a starting url that user is providing; first just identify the career page and print it out. no explanation needed. print this out as JSON and key to be career_page and put also the company in JSON. check for links in footer. open the page in headless mode like a chromium would do and wait for all ajax calls to finish then start scraping and look for career page link. this is the most important part. no explanation needed new"
 
-          # User input URL from workflow_dispatch
-          START_URL="${{ github.event.inputs.start_url }}"
-
-          # Construct user prompt with the start URL
           USER_PROMPT="Starting URL: $START_URL"
 
-          # Prepare JSON payload for API
-          read -r -d '' PAYLOAD <<EOF
-          {
-            "model": "compound-beta",
-            "messages": [
-              {
-                "role": "system",
-                "content": "$SYSTEM_PROMPT"
-              },
-              {
-                "role": "user",
-                "content": "$USER_PROMPT"
-              }
+          # Compose JSON payload with both system and user messages
+          PAYLOAD=$(jq -n --arg model "$MODEL" --arg sys "$SYSTEM_PROMPT" --arg user "$USER_PROMPT" '{
+            model: $model,
+            messages: [
+              {role: "system", content: $sys},
+              {role: "user", content: $user}
             ]
-          }
-          EOF
+          }')
 
-          echo "Sending payload to GroqCloud API:"
+          echo "Payload:"
           echo "$PAYLOAD"
 
           RESPONSE=$(curl -s -X POST https://api.groq.com/openai/v1/chat/completions \
@@ -50,19 +51,19 @@ jobs:
             -H "Authorization: Bearer $GROQ_API_KEY" \
             -d "$PAYLOAD")
 
-          echo "Full API response:"
+          echo "Full response:"
           echo "$RESPONSE"
 
-          # Extract the model's JSON output from the response
+          # Extract the content field
           CONTENT=$(echo "$RESPONSE" | jq -r '.choices[0].message.content')
 
-          echo "Extracted JSON content:"
+          echo "Extracted content:"
           echo "$CONTENT"
 
-          # Set output for next steps
+          # Set output for next steps if needed
           echo "::set-output name=career_info::$CONTENT"
 
-      - name: Show extracted career page info
+      - name: Show extracted career info
         run: |
-          echo "Career info JSON from GroqCloud:"
-          echo '${{ steps.groq_call.outputs.career_info }}'
+          echo "Career info JSON:"
+          echo '${{ steps.call_api.outputs.career_info }}'
