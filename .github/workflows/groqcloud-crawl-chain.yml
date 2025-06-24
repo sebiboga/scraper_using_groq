@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       start_url:
-        description: 'Starting URL domain (e.g. https://farmec.ro)'
+        description: 'Starting URL domain'
         required: true
         type: string
         default: 'https://farmec.ro'
@@ -43,8 +43,7 @@ jobs:
             ]
           }')
 
-          echo "Payload:"
-          echo "$PAYLOAD"
+         
 
           RESPONSE=$(curl -s -X POST https://api.groq.com/openai/v1/chat/completions \
             -H "Content-Type: application/json" \
@@ -59,7 +58,7 @@ jobs:
 
           echo "Extracted content:"
           echo "$CONTENT"
-
+          echo "============================="
           # Set output for next steps if needed
           echo "::set-output name=career_info::$CONTENT"
 
