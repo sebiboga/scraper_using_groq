@@ -1,0 +1,56 @@
+name: GroqCloud Crawl Chain with curl
+
+on:
+  workflow_dispatch:
+
+jobs:
+  groqcloud_crawl:
+    runs-on: ubuntu-latest
+    env:
+      GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+    steps:
+      - name: Call GroqCloud API - First Prompt
+        id: first_call
+        run: |
+          # Define the prompt JSON payload
+          read -r -d '' PAYLOAD <<EOF
+          {
+            "model": "compound-beta",
+            "messages": [
+              {
+                "role": "user",
+                "content": "act like a smart crawler better than apache nutch; the crawling will start from a starting url that user is providing; first just identify the career page and print it out. no explanation needed. print this out as JSON and key to be career_page and put also the company in JSON. check for links in footer. open the page in headless mode like a chromium would do and wait for all ajax calls to finish then start scraping and look for career page link. this is the most important part. no explanation needed new"
+              }
+            ]
+          }
+          EOF
+
+          # Call the GroqCloud API
+          RESPONSE=$(curl -s -X POST https://api.groq.com/openai/v1/chat/completions \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer $GROQ_API_KEY" \
+            -d "$PAYLOAD")
+
+          echo "Full response: $RESPONSE"
+
+          # Extract the content field from the response JSON using jq
+          CONTENT=$(echo "$RESPONSE" | jq -r '.choices[0].message.content')
+
+          echo "Extracted content: $CONTENT"
+
+          # Save the extracted JSON content as output for next steps
+          echo "::set-output name=career_info::$CONTENT"
+
+      - name: Use extracted career info
+        run: |
+          echo "Career page info from first call:"
+          echo '${{ steps.first_call.outputs.career_info }}'
+
+          # Example: parse career_page URL from the JSON output
+          CAREER_PAGE=$(echo '${{ steps.first_call.outputs.career_info }}' | jq -r '.career_page')
+          COMPANY=$(echo '${{ steps.first_call.outputs.career_info }}' | jq -r '.company')
+
+          echo "Career page URL: $CAREER_PAGE"
+          echo "Company: $COMPANY"
+
+          # You can now use $CAREER_PAGE in the next API call or other steps
