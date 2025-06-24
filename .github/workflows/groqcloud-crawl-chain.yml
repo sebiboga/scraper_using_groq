@@ -32,7 +32,7 @@ jobs:
         run: |
           SYSTEM_PROMPT="act like a smart crawler better than apache nutch; the crawling will start from a starting url that user is providing; first just identify the career page and print it out. no explanation needed. print this out as JSON and key to be career_page and put also the company in JSON. check for links in footer.  look for career page link. this is the most important part. no explanation needed new"
 
-          USER_PROMPT="Starting URL: $START_URL"
+          USER_PROMPT="Starting URL: $START_URL . Respond *only* with the JSON object, no explanations, no extra text."
 
           # Compose JSON payload with both system and user messages
           PAYLOAD=$(jq -n --arg model "$MODEL" --arg sys "$SYSTEM_PROMPT" --arg user "$USER_PROMPT" '{
@@ -62,7 +62,4 @@ jobs:
           # Set output for next steps if needed
           echo "::set-output name=career_info::$CONTENT"
 
-      - name: Show extracted career info
-        run: |
-          echo "Career info JSON:"
-          echo '${{ steps.call_api.outputs.career_info }}'
+    
