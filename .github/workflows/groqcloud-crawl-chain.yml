@@ -1,56 +1,68 @@
-name: GroqCloud Crawl Chain with curl
+name: GroqCloud Crawl Career Page
 
 on:
   workflow_dispatch:
+    inputs:
+      start_url:
+        description: 'Starting URL domain (e.g. https://farmec.ro)'
+        required: true
+        default: 'https://farmec.ro'
 
 jobs:
-  groqcloud_crawl:
+  crawl_career_page:
     runs-on: ubuntu-latest
     env:
       GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
     steps:
-      - name: Call GroqCloud API - First Prompt
-        id: first_call
+      - name: Call GroqCloud API with system prompt and user start URL
+        id: groq_call
         run: |
-          # Define the prompt JSON payload
+          SYSTEM_PROMPT="act like a smart crawler better than apache nutch; the crawling will start from a starting url that user is providing; first just identify the career page and print it out. no explanation needed. print this out as JSON and key to be career_page and put also the company in JSON. check for links in footer. open the page in headless mode like a chromium would do and wait for all ajax calls to finish then start scraping and look for career page link. this is the most important part. no explanation needed new"
+
+          # User input URL from workflow_dispatch
+          START_URL="${{ github.event.inputs.start_url }}"
+
+          # Construct user prompt with the start URL
+          USER_PROMPT="Starting URL: $START_URL"
+
+          # Prepare JSON payload for API
           read -r -d '' PAYLOAD <<EOF
           {
             "model": "compound-beta",
             "messages": [
               {
+                "role": "system",
+                "content": "$SYSTEM_PROMPT"
+              },
+              {
                 "role": "user",
-                "content": "act like a smart crawler better than apache nutch; the crawling will start from a starting url that user is providing; first just identify the career page and print it out. no explanation needed. print this out as JSON and key to be career_page and put also the company in JSON. check for links in footer. open the page in headless mode like a chromium would do and wait for all ajax calls to finish then start scraping and look for career page link. this is the most important part. no explanation needed new"
+                "content": "$USER_PROMPT"
               }
             ]
           }
           EOF
 
-          # Call the GroqCloud API
+          echo "Sending payload to GroqCloud API:"
+          echo "$PAYLOAD"
+
           RESPONSE=$(curl -s -X POST https://api.groq.com/openai/v1/chat/completions \
             -H "Content-Type: application/json" \
             -H "Authorization: Bearer $GROQ_API_KEY" \
             -d "$PAYLOAD")
 
-          echo "Full response: $RESPONSE"
+          echo "Full API response:"
+          echo "$RESPONSE"
 
-          # Extract the content field from the response JSON using jq
+          # Extract the model's JSON output from the response
           CONTENT=$(echo "$RESPONSE" | jq -r '.choices[0].message.content')
 
-          echo "Extracted content: $CONTENT"
+          echo "Extracted JSON content:"
+          echo "$CONTENT"
 
-          # Save the extracted JSON content as output for next steps
+          # Set output for next steps
           echo "::set-output name=career_info::$CONTENT"
 
-      - name: Use extracted career info
+      - name: Show extracted career page info
         run: |
-          echo "Career page info from first call:"
-          echo '${{ steps.first_call.outputs.career_info }}'
-
-          # Example: parse career_page URL from the JSON output
-          CAREER_PAGE=$(echo '${{ steps.first_call.outputs.career_info }}' | jq -r '.career_page')
-          COMPANY=$(echo '${{ steps.first_call.outputs.career_info }}' | jq -r '.company')
-
-          echo "Career page URL: $CAREER_PAGE"
-          echo "Company: $COMPANY"
-
-          # You can now use $CAREER_PAGE in the next API call or other steps
+          echo "Career info JSON from GroqCloud:"
+          echo '${{ steps.groq_call.outputs.career_info }}'
