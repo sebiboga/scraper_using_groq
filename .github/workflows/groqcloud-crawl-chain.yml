@@ -19,7 +19,7 @@ on:
         default: compound-beta
 
 jobs:
-  run-curl:
+  crawl_career_page:
     runs-on: ubuntu-latest
 
     steps:
@@ -58,8 +58,42 @@ jobs:
 
           echo "Extracted content:"
           echo "$CONTENT"
-          echo "============================="
-          # Set output for next steps if needed
-          echo "::set-output name=career_info::$CONTENT"
+          CAREER_PAGE=$(echo "$CONTENT" | jq -r '.career_page')
+          echo "career_page=$CAREER_PAGE" >> $GITHUB_OUTPUT
+          
+  crawl_job_links:
+   runs-on: ubuntu-latest
+   needs: crawl_career_page
+   steps:
+    - name: Call GroqCloud API to crawl job links from career page
+      id: call_job_links
+      env:
+        GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+        CAREER_PAGE: ${{ needs.crawl_career_page.outputs.career_page }}
+        MODEL: ${{ github.event.inputs.model }}
+      run: |
+        SYSTEM_PROMPT="act like a smart crawler like apache nutch; print out all urls you find in this page. do a crawl level 1; do not print out duplicates. filter those that have higher probability to be a job description pages; output as a JSON file with key job_link and company"
+        USER_PROMPT="Starting URL: $CAREER_PAGE . Respond *only* with the JSON object, no explanations, no extra text."
+
+        PAYLOAD=$(jq -n --arg model "$MODEL" --arg sys "$SYSTEM_PROMPT" --arg user "$USER_PROMPT" '{
+          model: $model,
+          messages: [
+            {role: "system", content: $sys},
+            {role: "user", content: $user}
+          ]
+        }')
+
+        RESPONSE=$(curl -s -X POST https://api.groq.com/openai/v1/chat/completions \
+          -H "Content-Type: application/json" \
+          -H "Authorization: Bearer $GROQ_API_KEY" \
+          -d "$PAYLOAD")
+
+        CONTENT=$(echo "$RESPONSE" | jq -r '.choices[0].message.content')
+
+        echo "Extracted job links JSON:"
+        echo "$CONTENT"
+
+        echo "job_links=$CONTENT" >> $GITHUB_OUTPUT
+          
 
     
