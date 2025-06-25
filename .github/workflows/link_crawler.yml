@@ -32,7 +32,7 @@ jobs:
         run: |
           SYSTEM_PROMPT="act like a smart crawler like apache nutch; print out all urls you find in this page. do a crawl level 1; do not print out duplicates. filter those that have higher probability to be a job description pages; output as a JSON file with key job_link and company"
 
-          USER_PROMPT="Career page URL: $CAREER_PAGE . Respond *only* with the JSON array, no explanations, no extra text. extract the links that are most likely the job description pages"
+          USER_PROMPT="Career page URL: $CAREER_PAGE . Respond *only* with the JSON array, no explanations, no extra text. extract the links that are most likely the job description pages. I expect this to be an array of objects"
 
           # Compose JSON payload with both system and user messages
           PAYLOAD=$(jq -n --arg model "$MODEL" --arg sys "$SYSTEM_PROMPT" --arg user "$USER_PROMPT" '{
