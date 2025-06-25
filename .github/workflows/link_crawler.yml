@@ -1,0 +1,67 @@
+name: Run GroqCloud Job Link Crawler
+
+on:
+  workflow_dispatch:
+    inputs:
+      career_page:
+        description: 'Career page URL to crawl'
+        required: true
+        type: string
+        default: 'https://farmec.ro/cariere'
+      model:
+        description: 'Select the model to use'
+        required: true
+        type: choice
+        options:
+          - compound-beta
+          - compound-beta-mini
+          - llama-3.3-70b-versatile
+        default: compound-beta
+
+jobs:
+  crawl_job_links:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Call GroqCloud API to find job links
+        id: call_api
+        env:
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          CAREER_PAGE: ${{ github.event.inputs.career_page }}
+          MODEL: ${{ github.event.inputs.model }}
+        run: |
+          SYSTEM_PROMPT="act like a smart crawler like apache nutch; print out all urls you find in this page. do a crawl level 1; do not print out duplicates. filter those that have higher probability to be a job description pages; output as a JSON file with key job_link and company"
+
+          USER_PROMPT="Career page URL: $CAREER_PAGE . Respond *only* with the JSON array, no explanations, no extra text."
+
+          # Compose JSON payload with both system and user messages
+          PAYLOAD=$(jq -n --arg model "$MODEL" --arg sys "$SYSTEM_PROMPT" --arg user "$USER_PROMPT" '{
+            model: $model,
+            messages: [
+              {role: "system", content: $sys},
+              {role: "user", content: $user}
+            ]
+          }')
+
+          RESPONSE=$(curl -s -X POST https://api.groq.com/openai/v1/chat/completions \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer $GROQ_API_KEY" \
+            -d "$PAYLOAD")
+
+          echo "Full response:"
+          echo "$RESPONSE"
+
+          # Extract the content field (the JSON array)
+          CONTENT=$(echo "$RESPONSE" | jq -r '.choices[0].message.content')
+
+          echo "Extracted content:"
+          echo "$CONTENT"
+
+          # Save the JSON output to a file
+          echo "$CONTENT" > job_links.json
+
+      - name: Upload job links JSON
+        uses: actions/upload-artifact@v4
+        with:
+          name: job_links
+          path: job_links.json
