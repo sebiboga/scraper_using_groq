@@ -21,8 +21,7 @@ on:
 jobs:
   crawl_career_page:
     runs-on: ubuntu-latest
-    outputs:
-      career_page: ${{ steps.call_api.outputs.career_page }}
+
     steps:
       - name: Call GroqCloud API with system and user prompts
         id: call_api
