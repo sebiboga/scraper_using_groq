@@ -58,3 +58,5 @@ jobs:
 
           echo "Extracted content:"
           echo "$CONTENT"
+          CAREER_PAGE=$(echo "$CONTENT" | jq -r '.career_page')
+          echo "career_page=$CAREER_PAGE" >> $GITHUB_OUTPUT
