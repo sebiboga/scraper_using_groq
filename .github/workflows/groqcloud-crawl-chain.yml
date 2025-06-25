@@ -73,7 +73,7 @@ jobs:
         MODEL: ${{ github.event.inputs.model }}
       run: |
         SYSTEM_PROMPT="act like a smart crawler like apache nutch; print out all urls you find in this page. do a crawl level 1; do not print out duplicates. filter those that have higher probability to be a job description pages; output as a JSON file with key job_link and company"
-        USER_PROMPT="Starting URL: https://www.farmec.ro/compania/cariere/ . Respond *only* with the JSON object, no explanations, no extra text."
+        USER_PROMPT="Starting URL: https://www.farmec.ro/compania/cariere/ . Respond *only* with the JSON object, no explanations, no extra text. do not error if unexpected EOF is reached."
 
         PAYLOAD=$(jq -n --arg model "$MODEL" --arg sys "$SYSTEM_PROMPT" --arg user "$USER_PROMPT" '{
           model: $model,
@@ -106,6 +106,3 @@ jobs:
 
           # Set output only if it's valid JSON
           echo "job_links=$JOB_LINKS" >> $GITHUB_OUTPUT
-          
-
-    
