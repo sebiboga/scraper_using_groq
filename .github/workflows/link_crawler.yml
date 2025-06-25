@@ -1,4 +1,4 @@
-name: Run GroqCloud Job Link Crawler
+name: Run GroqCloud Job Link Crawler with precise parameters
 
 on:
   workflow_dispatch:
@@ -23,7 +23,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Call GroqCloud API to find job links
+      - name: Call GroqCloud API with precise parameters
         id: call_api
         env:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
@@ -32,16 +32,30 @@ jobs:
         run: |
           SYSTEM_PROMPT="act like a smart crawler like apache nutch; print out all urls you find in this page. do a crawl level 1; do not print out duplicates. filter those that have higher probability to be a job description pages; output as a JSON file with key job_link and company"
 
-          USER_PROMPT="Career page URL: $CAREER_PAGE . Respond *only* with the JSON array, no explanations, no extra text. extract the links that are most likely the job description pages. I expect this to be an array of objects"
+          USER_PROMPT="$CAREER_PAGE"
 
-          # Compose JSON payload with both system and user messages
-          PAYLOAD=$(jq -n --arg model "$MODEL" --arg sys "$SYSTEM_PROMPT" --arg user "$USER_PROMPT" '{
-            model: $model,
-            messages: [
-              {role: "system", content: $sys},
-              {role: "user", content: $user}
-            ]
-          }')
+          # Compose JSON payload with all parameters matching Python example
+          PAYLOAD=$(jq -n \
+            --arg model "$MODEL" \
+            --arg sys "$SYSTEM_PROMPT" \
+            --arg user "$USER_PROMPT" \
+            --argjson temperature 1 \
+            --argjson max_tokens 1024 \
+            --argjson top_p 1 \
+            --argjson stream false \
+            --argjson stop null \
+            '{
+              model: $model,
+              messages: [
+                {role: "system", content: $sys},
+                {role: "user", content: $user}
+              ],
+              temperature: $temperature,
+              max_completion_tokens: $max_tokens,
+              top_p: $top_p,
+              stream: $stream,
+              stop: $stop
+            }')
 
           RESPONSE=$(curl -s -X POST https://api.groq.com/openai/v1/chat/completions \
             -H "Content-Type: application/json" \
@@ -51,7 +65,7 @@ jobs:
           echo "Full response:"
           echo "$RESPONSE"
 
-          # Extract the content field (the JSON array)
+          # Extract the content field (the JSON output from the model)
           CONTENT=$(echo "$RESPONSE" | jq -r '.choices[0].message.content')
 
           echo "Extracted content:"
