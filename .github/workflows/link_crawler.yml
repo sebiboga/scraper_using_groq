@@ -1,5 +1,4 @@
-name: Run GroqCloud Job Link Crawler with precise parameters
-
+name: Potential JOB DESCRIPTION pages
 on:
   workflow_dispatch:
     inputs:
