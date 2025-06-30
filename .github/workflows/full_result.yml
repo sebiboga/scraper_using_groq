@@ -1,0 +1,158 @@
+name: All JOBs
+
+on:
+  workflow_dispatch:
+    inputs:
+      career_page:
+        description: 'Career page URL to crawl'
+        required: true
+        type: string
+        default: 'https://www.farmec.ro/compania/cariere/'
+      model:
+        description: 'Select the model to use'
+        required: true
+        type: choice
+        options:
+          - compound-beta
+          - compound-beta-mini
+          - llama-3.3-70b-versatile
+        default: compound-beta
+
+jobs:
+  crawl_job_links:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Call GroqCloud API to crawl career page and extract job links
+        id: call_api
+        env:
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          CAREER_PAGE: ${{ github.event.inputs.career_page }}
+          MODEL: ${{ github.event.inputs.model }}
+        run: |
+          SYSTEM_PROMPT="act like a smart crawler like apache nutch; print out all urls you find in this page. do a crawl level 1; do not print out duplicates. filter those that have higher probability to be a job description pages; output as a JSON array with objects containing keys job_link and company."
+
+          USER_PROMPT="$CAREER_PAGE"
+
+          PAYLOAD=$(jq -n \
+            --arg model "$MODEL" \
+            --arg sys "$SYSTEM_PROMPT" \
+            --arg user "$USER_PROMPT" \
+            --argjson temperature 1 \
+            --argjson max_tokens 1024 \
+            --argjson top_p 1 \
+            --argjson stream false \
+            --argjson stop null \
+            '{
+              model: $model,
+              messages: [
+                {role: "system", content: $sys},
+                {role: "user", content: $user}
+              ],
+              temperature: $temperature,
+              max_completion_tokens: $max_tokens,
+              top_p: $top_p,
+              stream: $stream,
+              stop: $stop
+            }')
+
+          RESPONSE=$(curl -s -X POST https://api.groq.com/openai/v1/chat/completions \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer $GROQ_API_KEY" \
+            -d "$PAYLOAD")
+
+          echo "Full response:"
+          echo "$RESPONSE"
+
+          CONTENT=$(echo "$RESPONSE" | jq -r '.choices[0].message.content')
+
+          echo "Extracted content:"
+          echo "$CONTENT"
+
+          # Salvează conținutul JSON într-un fișier
+          echo "$CONTENT" > job_links.json
+
+      - name: Upload job links JSON
+        uses: actions/upload-artifact@v4
+        with:
+          name: job_links
+          path: job_links.json
+
+  extract_job_details:
+    needs: crawl_job_links
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download job links JSON artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: job_links
+          path: .
+
+      - name: Extract job details from each job link using GroqCloud
+        env:
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          MODEL: ${{ github.event.inputs.model }}
+        run: |
+          # Citim array-ul de job links
+          JOB_LINKS=$(jq -c '.[]' job_links.json)
+          RESULTS=()
+
+          SYSTEM_PROMPT="act like sherlock and investigate. given the potential job description links you receive by user, click on each page to extract: job_link, job_title, company, city, remote as remote state. output should be an array of JSON objects. just the JSON, no observations, no explanation. print it as a code so I can easily copy and paste"
+
+          for JOB in $JOB_LINKS; do
+            JOB_LINK=$(echo "$JOB" | jq -r '.job_link')
+            COMPANY=$(echo "$JOB" | jq -r '.company')
+
+            USER_PROMPT="{\"job_link\": \"$JOB_LINK\", \"company\": \"$COMPANY\"}"
+
+            PAYLOAD=$(jq -n \
+              --arg model "$MODEL" \
+              --arg sys "$SYSTEM_PROMPT" \
+              --arg user "$USER_PROMPT" \
+              --argjson temperature 1 \
+              --argjson max_tokens 1024 \
+              --argjson top_p 1 \
+              --argjson stream false \
+              --argjson stop null \
+              '{
+                model: $model,
+                messages: [
+                  {role: "system", content: $sys},
+                  {role: "user", content: $user}
+                ],
+                temperature: $temperature,
+                max_completion_tokens: $max_tokens,
+                top_p: $top_p,
+                stream: $stream,
+                stop: $stop
+              }')
+
+            RESPONSE=$(curl -s -X POST https://api.groq.com/openai/v1/chat/completions \
+              -H "Content-Type: application/json" \
+              -H "Authorization: Bearer $GROQ_API_KEY" \
+              -d "$PAYLOAD")
+
+            CONTENT=$(echo "$RESPONSE" | jq -r '.choices[0].message.content')
+
+            # Curățăm outputul pentru a elimina eventuale backticks sau cod markdown
+            CLEANED_CONTENT=$(echo "$CONTENT" | sed -e '1s/^``````$//')
+
+            RESULTS+=("$CLEANED_CONTENT")
+          done
+
+          # Construim un array JSON combinat
+          echo "[" > job_details.json
+          for ((i=0; i<${#RESULTS[@]}; i++)); do
+            echo "${RESULTS[$i]}" >> job_details.json
+            if [ $i -lt $((${#RESULTS[@]}-1)) ]; then
+              echo "," >> job_details.json
+            fi
+          done
+          echo "]" >> job_details.json
+
+      - name: Upload job details JSON artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: job_details
+          path: job_details.json
