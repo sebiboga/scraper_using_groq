@@ -7,9 +7,16 @@ on:
         required: true
         type: choice
         options:
+          - whisper-large-v3-turbo
+          - whisper-large-v3
+          - openai/gpt-oss-20b
+          - openai/gpt-oss-120b
+          - meta-llama/llama-guard-4-12b
           - llama-3.3-70b-versatile
+          - llama-3.1-8b-instant
           - compound-beta
           - compound-beta-mini
+        default: compound-beta
       url:
         description: 'Enter the URL to analyze as a job description page'
         required: true
